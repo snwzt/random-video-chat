@@ -1,0 +1,148 @@
+{{ block "chat" . }}
+
+<body>
+    <style>
+        body,
+        html {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: row;
+
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        #videobox,
+        #chatbox {
+            display: flex;
+            flex-direction: column;
+
+            height: 100%;
+            width: 50dvw;
+        }
+
+        img {
+            height: 50dvh;
+            object-fit: cover;
+        }
+
+        #controls {
+            display: flex;
+            justify-content: space-between;
+
+            padding: 0.5rem;
+            background-color: grey;
+            color: white;
+        }
+
+        #bubbleArea {
+            flex-grow: 1;
+            padding: 0.5rem;
+
+            overflow-y: auto;
+        }
+
+        #sendArea {
+            display: flex;
+            flex-direction: row;
+
+            padding: 0.5rem;
+        }
+
+        #sendArea input[type="text"] {
+            width: 100%;
+
+            padding: 0.5rem;
+        }
+    </style>
+
+    <div id="videobox">
+        <img src="https://static.wikia.nocookie.net/beluga/images/d/da/V8z0crk5gho71.webp" alt="">
+        <img src="https://i.kym-cdn.com/photos/images/newsfeed/002/378/734/b2a.png" alt="">
+    </div>
+    <div id="chatbox">
+        <div id="controls">
+            <input type="file">
+            <button hx-get="/match" hx-swap="none">Match</button>
+        </div>
+
+        <div id="bubbleArea">
+            <div class="bubble">
+                <h3>Sender:</h3>
+                <p>Hello</p>
+            </div>
+
+            <div class="bubble">
+                <h3>You:</h3>
+                <p>Hi</p>
+            </div>
+
+            <div class="bubble">
+                <h3>You:</h3>
+                <img src="https://media1.tenor.com/m/lStgaNc7YHAAAAAd/komaru-cat.gif" alt="">
+            </div>
+
+            <div class="bubble">
+                <h3>Sender:</h3>
+                <img src="https://media1.tenor.com/m/lStgaNc7YHAAAAAd/komaru-cat.gif" alt="">
+            </div>
+        </div>
+
+        <form id="sendArea">
+            <input type="text">
+            <input type="submit" value="Send">
+        </form>
+    </div>
+
+    <script>
+        const socket = new WebSocket('{{ .wsAddr }}');
+
+        function displayMessage(message) {
+            const bubbleArea = document.getElementById('bubbleArea');
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.classList.add('bubble');
+            bubbleDiv.innerHTML = '<h3>Sender:</h3><p>' + message + '</p>';
+            bubbleArea.appendChild(bubbleDiv);
+            bubbleArea.scrollTop = bubbleArea.scrollHeight;
+        }
+
+        document.getElementById('sendArea').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            const inputField = document.querySelector('#sendArea input[type="text"]');
+            const message = inputField.value.trim();
+
+            if (message !== '') {
+                socket.send(message);
+
+                const bubbleArea = document.getElementById('bubbleArea');
+                const bubbleDiv = document.createElement('div');
+                bubbleDiv.classList.add('bubble', 'you');
+                bubbleDiv.innerHTML = '<h3>You:</h3><p>' + message + '</p>';
+                bubbleArea.appendChild(bubbleDiv);
+                bubbleArea.scrollTop = bubbleArea.scrollHeight;
+
+                inputField.value = '';
+            }
+        });
+
+        socket.addEventListener('open', function (event) {
+            console.log('WebSocket connection established.');
+        });
+
+        socket.addEventListener('message', function (event) {
+            console.log('Message from server:', event.data);
+            displayMessage(event.data);
+        });
+
+        socket.addEventListener('error', function (event) {
+            console.error('WebSocket error:', event);
+        });
+
+        socket.addEventListener('close', function (event) {
+            console.log('WebSocket connection closed:', event);
+        });
+    </script>
+</body>
+{{ end }}
