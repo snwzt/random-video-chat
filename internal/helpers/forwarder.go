@@ -2,14 +2,15 @@ package helpers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"log"
 	"snwzt/rvc/data/models"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/rs/zerolog"
 )
 
-func Forwarder(cancelChan chan string, match models.Match, rclient *redis.Client) {
+func Forwarder(cancelChan chan string, match models.Match, rclient *redis.Client, log *zerolog.Logger) {
 	User1Inc := match.UserID1 + ":incoming"
 	User1Out := match.UserID1 + ":outgoing"
 	User2Inc := match.UserID2 + ":incoming"
@@ -30,20 +31,42 @@ func Forwarder(cancelChan chan string, match models.Match, rclient *redis.Client
 	// meet and greet
 	username1, err := rclient.HGet(context.Background(), fmt.Sprintf("userentry:%s", match.UserID1), "username").Result()
 	if err != nil {
-		log.Println(err)
+		log.Err(err).Msg("unable to get userentry")
 	}
 
 	username2, err := rclient.HGet(context.Background(), fmt.Sprintf("userentry:%s", match.UserID2), "username").Result()
 	if err != nil {
-		log.Println(err)
+		log.Err(err).Msg("unable to get userentry")
 	}
 
-	if err := rclient.Publish(context.Background(), User1Inc, username2).Err(); err != nil {
-		log.Println(err)
+	msgJSON1, err := json.Marshal(&models.SendMessage{
+		Event: "candidate",
+		Data: &models.Candidate{
+			SDP:      "",
+			Username: username2,
+		},
+	})
+	if err != nil {
+		log.Err(err).Msg("unable to marshal message")
 	}
 
-	if err := rclient.Publish(context.Background(), User2Inc, username1).Err(); err != nil {
-		log.Println(err)
+	if err := rclient.Publish(context.Background(), User1Inc, msgJSON1).Err(); err != nil {
+		log.Err(err).Msg("unable to publish to user1inc")
+	}
+
+	msgJSON2, err := json.Marshal(&models.SendMessage{
+		Event: "candidate",
+		Data: &models.Candidate{
+			SDP:      "",
+			Username: username1,
+		},
+	})
+	if err != nil {
+		log.Err(err).Msg("unable to marshal message")
+	}
+
+	if err := rclient.Publish(context.Background(), User2Inc, msgJSON2).Err(); err != nil {
+		log.Err(err).Msg("unable to publish to user1inc")
 	}
 
 	// user1out -> user2inc
@@ -51,27 +74,45 @@ func Forwarder(cancelChan chan string, match models.Match, rclient *redis.Client
 	for {
 		select {
 		case <-cancelChan:
-			log.Println("forwarder" + match.ID + "has been removed")
+			log.Info().Msg("forwarder " + match.ID + " has been removed")
 			return
 		case msg, ok := <-user1Out.Channel():
 			if !ok {
-				log.Println("chat channel " + User1Out + " closed unexpectedly")
+				log.Info().Msg("chat channel " + User1Out + " closed unexpectedly")
 				return
 			}
-			log.Println(msg.Payload)
 
-			if err := rclient.Publish(context.Background(), User2Inc, msg.Payload).Err(); err != nil {
-				log.Println(err)
+			msgJSON, err := json.Marshal(&models.SendMessage{
+				Event: "message",
+				Data: &models.Chat{
+					Message: msg.Payload,
+				},
+			})
+			if err != nil {
+				log.Err(err).Msg("unable to marshal message")
+			}
+
+			if err := rclient.Publish(context.Background(), User2Inc, msgJSON).Err(); err != nil {
+				log.Err(err).Msg("unable to publish to user2inc")
 			}
 		case msg, ok := <-user2Out.Channel():
 			if !ok {
-				log.Println("chat channel " + User2Out + " closed unexpectedly")
+				log.Info().Msg("chat channel " + User1Out + " closed unexpectedly")
 				return
 			}
-			log.Println(msg.Payload)
 
-			if err := rclient.Publish(context.Background(), User1Inc, msg.Payload).Err(); err != nil {
-				log.Println(err)
+			msgJSON, err := json.Marshal(&models.SendMessage{
+				Event: "message",
+				Data: &models.Chat{
+					Message: msg.Payload,
+				},
+			})
+			if err != nil {
+				log.Err(err).Msg("unable to marshal message")
+			}
+
+			if err := rclient.Publish(context.Background(), User1Inc, msgJSON).Err(); err != nil {
+				log.Err(err).Msg("unable to publish to user1inc")
 			}
 		}
 	}

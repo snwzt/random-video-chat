@@ -1,9 +1,9 @@
 package main
 
 import (
-	"log"
 	"os"
 	"snwzt/rvc/internal/handlers"
+	"snwzt/rvc/pkg/logger"
 	"snwzt/rvc/services/db"
 	"snwzt/rvc/services/forwarder"
 
@@ -11,9 +11,10 @@ import (
 )
 
 func main() {
+	logger := logger.NewLogger()
 	err := godotenv.Load("config/.env")
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		logger.Err(err).Msg("unable to load .env")
 	}
 
 	cancelChan := make(chan string)
@@ -21,12 +22,13 @@ func main() {
 
 	redis, err := db.NewRedisStore(os.Getenv("REDIS_URI"))
 	if err != nil {
-		log.Println(err)
+		logger.Err(err).Msg("unable to connect to redis")
 	}
 
 	forwarderOperationsHandle := &handlers.ForwarderOperationsHandle{
 		Redis:           redis,
 		CancelForwarder: cancelChan,
+		Logger:          logger,
 	}
 	forwarder := forwarder.NewForwarder(forwarderOperationsHandle)
 

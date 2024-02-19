@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"os"
 	"snwzt/rvc/internal/handlers"
 	"snwzt/rvc/pkg/common"
@@ -15,28 +14,27 @@ import (
 )
 
 func main() {
+	logger := logger.NewLogger()
 	var wg sync.WaitGroup
 	err := godotenv.Load("config/.env")
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		logger.Err(err).Msg("unable to load .env")
 	}
 
 	instance := echo.New()
 
 	instance.Renderer, err = common.NewTemplate("web/*.html")
 	if err != nil {
-		log.Println(err)
+		logger.Err(err).Msg("unable to load templates")
 	}
 
 	redis, err := db.NewRedisStore(os.Getenv("REDIS_URI"))
 	if err != nil {
-		log.Println(err)
+		logger.Err(err).Msg("unable to connect to redis")
 	}
 	userHttpHandle := &handlers.UserServerHandle{
 		Redis: redis,
 	}
-
-	logger := logger.NewLogger()
 
 	s := user.NewUserServer(":5000", instance, userHttpHandle, logger)
 
@@ -48,7 +46,8 @@ func main() {
 	}()
 
 	userOperationsHandle := &handlers.UserOperationsHandle{
-		Redis: redis,
+		Redis:  redis,
+		Logger: logger,
 	}
 	userOperations := user.NewUserOperations(userOperationsHandle)
 

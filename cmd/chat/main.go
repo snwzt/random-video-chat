@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"os"
 	"snwzt/rvc/internal/handlers"
 	"snwzt/rvc/pkg/logger"
@@ -13,21 +12,21 @@ import (
 )
 
 func main() {
+	logger := logger.NewLogger()
 	err := godotenv.Load("config/.env")
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		logger.Err(err).Msg("unable to load .env")
 	}
 
 	redis, err := db.NewRedisStore(os.Getenv("REDIS_URI"))
 	if err != nil {
-		log.Println(err)
+		logger.Err(err).Msg("unable to connect to redis")
 	}
-
-	logger := logger.NewLogger()
 
 	instance := echo.New()
 	chatServerHandle := &handlers.ChatServerHandle{
-		Redis: redis,
+		Redis:  redis,
+		Logger: logger,
 	}
 	s := chat.NewChatServer(":5001", instance, chatServerHandle, logger)
 
