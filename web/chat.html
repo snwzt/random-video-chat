@@ -61,6 +61,7 @@
         <img src="https://static.wikia.nocookie.net/beluga/images/d/da/V8z0crk5gho71.webp" alt="">
         <img src="https://i.kym-cdn.com/photos/images/newsfeed/002/378/734/b2a.png" alt="">
     </div>
+
     <div id="chatbox">
         <div id="controls">
             <input type="file">
@@ -68,25 +69,6 @@
         </div>
 
         <div id="bubbleArea">
-            <div class="bubble">
-                <h3>Sender:</h3>
-                <p>Hello</p>
-            </div>
-
-            <div class="bubble">
-                <h3>You:</h3>
-                <p>Hi</p>
-            </div>
-
-            <div class="bubble">
-                <h3>You:</h3>
-                <img src="https://media1.tenor.com/m/lStgaNc7YHAAAAAd/komaru-cat.gif" alt="">
-            </div>
-
-            <div class="bubble">
-                <h3>Sender:</h3>
-                <img src="https://media1.tenor.com/m/lStgaNc7YHAAAAAd/komaru-cat.gif" alt="">
-            </div>
         </div>
 
         <form id="sendArea">
@@ -97,12 +79,13 @@
 
     <script>
         const socket = new WebSocket('{{ .wsAddr }}');
+        let sender = "";
 
         function displayMessage(message) {
             const bubbleArea = document.getElementById('bubbleArea');
             const bubbleDiv = document.createElement('div');
             bubbleDiv.classList.add('bubble');
-            bubbleDiv.innerHTML = '<h3>Sender:</h3><p>' + message + '</p>';
+            bubbleDiv.innerHTML = '<h3>' + sender + ':</h3><p>' + message + '</p>';
             bubbleArea.appendChild(bubbleDiv);
             bubbleArea.scrollTop = bubbleArea.scrollHeight;
         }
@@ -135,6 +118,11 @@
             console.log('Message from server:', event.data);
             displayMessage(event.data);
         });
+
+        socket.addEventListener('exchange', function(event) {
+            sender = event.data;
+            console.log('Sender Name:', event.data);
+        })
 
         socket.addEventListener('error', function (event) {
             console.error('WebSocket error:', event);

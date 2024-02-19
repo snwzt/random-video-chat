@@ -11,10 +11,15 @@ type Template struct {
 	tmpl *template.Template
 }
 
-func NewTemplate(parse string) *Template {
-	return &Template{
-		tmpl: template.Must(template.ParseGlob(parse)),
+func NewTemplate(parse string) (*Template, error) {
+	parsedTmpl, err := template.ParseGlob(parse)
+	if err != nil {
+		return nil, err
 	}
+
+	return &Template{
+		tmpl: parsedTmpl,
+	}, nil
 }
 
 func (t *Template) Render(w io.Writer, name string, data interface{}, c echo.Context) error {

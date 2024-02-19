@@ -17,15 +17,15 @@ var Upgrader = websocket.Upgrader{
 	},
 }
 
-type ChatHTTPHandle struct {
+type ChatServerHandle struct {
 	Redis *redis.Client
 }
 
-func (h *ChatHTTPHandle) CheckHealth(c echo.Context) error {
+func (h *ChatServerHandle) CheckHealth(c echo.Context) error {
 	return c.NoContent(http.StatusOK)
 }
 
-func (h *ChatHTTPHandle) Chat(c echo.Context) error {
+func (h *ChatServerHandle) Chat(c echo.Context) error {
 	id := c.Param("id")
 	if id == "" {
 		return echo.NewHTTPError(http.StatusBadRequest)
@@ -41,7 +41,7 @@ func (h *ChatHTTPHandle) Chat(c echo.Context) error {
 	incMsgChannel := id + ":incoming"
 
 	var wg sync.WaitGroup
-	ch := make(chan bool)
+	ch := make(chan bool, 1)
 
 	wg.Add(1)
 	go func() {
@@ -53,26 +53,22 @@ func (h *ChatHTTPHandle) Chat(c echo.Context) error {
 				log.Println(err)
 			}
 
-			log.Println(msgType)
-
 			if msgType == -1 { // ws closing
 				ch <- true
 
-				err = h.Redis.Publish(context.Background(), outMsgChannel, "unavaliable").Err()
-				if err != nil {
+				if err := h.Redis.Publish(context.Background(), outMsgChannel, "unavaliable").Err(); err != nil {
 					log.Println(err)
 				}
 
-				if err := h.Redis.LPush(context.Background(), "deleteuser_queue", id).Err(); err != nil {
+				if err := h.Redis.LPush(context.Background(), "removeuser", id).Err(); err != nil {
 					log.Println(err)
 				}
 
-				break
+				return
 			}
 
 			// Publish the received message to a Redis Pub/Sub channel
-			err = h.Redis.Publish(context.Background(), outMsgChannel, string(message)).Err()
-			if err != nil {
+			if err := h.Redis.Publish(context.Background(), outMsgChannel, string(message)).Err(); err != nil {
 				log.Println(err)
 			}
 		}
@@ -96,8 +92,7 @@ func (h *ChatHTTPHandle) Chat(c echo.Context) error {
 				}
 
 				// Send the message to the WebSocket
-				err = ws.WriteMessage(websocket.TextMessage, []byte(msg.Payload))
-				if err != nil {
+				if err := ws.WriteMessage(websocket.TextMessage, []byte(msg.Payload)); err != nil {
 					log.Println(err)
 				}
 			}
