@@ -84,8 +84,8 @@
         const bubbleArea = document.getElementById('bubbleArea');
         let sender;
         let localStream;
-        let peerConnection; 
-        let remoteStream; 
+        let peerConnection;
+        let remoteStream;
 
         socket.addEventListener('open', async () => {
             console.log('WebSocket connection open.')
@@ -157,7 +157,15 @@
                     sender = msg.data.username;
                     document.getElementById("other-person").innerText = "Connected to: " + sender;
 
-                    peerConnection = new RTCPeerConnection();
+                    peerConnection = new RTCPeerConnection({
+                        iceServers: [
+                            {
+                                urls: '{{ .TurnUrl }}',
+                                username: '{{ .TurnUser }}',
+                                credential: '{{ .TurnCred }}'
+                            }
+                        ]
+                    });
 
                     // handle local stream
                     localStream.getTracks().forEach(track => {
