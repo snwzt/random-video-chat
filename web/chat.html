@@ -22,7 +22,7 @@
             width: 50dvw;
         }
 
-        img {
+        video {
             height: 50dvh;
             object-fit: cover;
         }
@@ -58,14 +58,14 @@
     </style>
 
     <div id="videobox">
-        <img src="https://static.wikia.nocookie.net/beluga/images/d/da/V8z0crk5gho71.webp" alt="">
-        <img src="https://i.kym-cdn.com/photos/images/newsfeed/002/378/734/b2a.png" alt="">
+        <video id="localVideo" autoplay></video>
+        <video id="remoteVideo" autoplay></video>
     </div>
 
     <div id="chatbox">
         <div id="controls">
-            <input type="file">
-            <button hx-get="/match" hx-swap="none">Match</button>
+            <p id="other-person"></p>
+            <button hx-get="/match" hx-swap="none" onclick="rematch()">Match</button>
         </div>
 
         <div id="bubbleArea">
@@ -78,58 +78,172 @@
     </div>
 
     <script>
-        const socket = new WebSocket('{{ .wsAddr }}');
-        let sender = "";
+        const socket = new WebSocket('{{ .WsAddr }}');
+        const localVideo = document.getElementById('localVideo');
+        const remoteVideo = document.getElementById('remoteVideo');
+        const bubbleArea = document.getElementById('bubbleArea');
+        let sender;
+        let localStream;
+        let peerConnection; 
+        let remoteStream; 
 
-        function displayMessage(message) {
-            const bubbleArea = document.getElementById('bubbleArea');
-            const bubbleDiv = document.createElement('div');
+        socket.addEventListener('open', async () => {
+            console.log('WebSocket connection open.')
+        });
+
+        socket.addEventListener('error', (event) => {
+            console.error('WebSocket error:', event);
+        });
+
+        socket.addEventListener('close', (event) => {
+            console.log('WebSocket connection closed:', event);
+        });
+
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+            .then(function (stream) {
+                localStream = stream;
+                localVideo.srcObject = localStream;
+            })
+            .catch(function (err) {
+                console.error('Error getting user media:', err);
+            });
+
+        function displayMessage(n, message) {
+            let bubbleDiv = document.createElement('div');
             bubbleDiv.classList.add('bubble');
-            bubbleDiv.innerHTML = '<h3>' + sender + ':</h3><p>' + message + '</p>';
+            bubbleDiv.innerHTML = "<h3>" + n + ":</h3><p>" + message + "</p>";
             bubbleArea.appendChild(bubbleDiv);
             bubbleArea.scrollTop = bubbleArea.scrollHeight;
         }
 
+        function removeRemoteStream() {
+            if (peerConnection) {
+                peerConnection.close();
+                remoteVideo.srcObject = null;
+                document.getElementById("other-person").innerText = "";
+                bubbleArea.innerHTML = '';
+            }
+        }
+
+        function rematch() {
+            socket.send(JSON.stringify({
+                event: 'rematch',
+                data: null
+            }));
+
+            removeRemoteStream();
+        }
+
         document.getElementById('sendArea').addEventListener('submit', function (event) {
             event.preventDefault();
-
             const inputField = document.querySelector('#sendArea input[type="text"]');
-            const message = inputField.value.trim();
+            const message = JSON.stringify({
+                event: 'message',
+                data: inputField.value.trim(),
+            });
 
             if (message !== '') {
                 socket.send(message);
-
-                const bubbleArea = document.getElementById('bubbleArea');
-                const bubbleDiv = document.createElement('div');
-                bubbleDiv.classList.add('bubble', 'you');
-                bubbleDiv.innerHTML = '<h3>You:</h3><p>' + message + '</p>';
-                bubbleArea.appendChild(bubbleDiv);
-                bubbleArea.scrollTop = bubbleArea.scrollHeight;
-
+                displayMessage("You", message);
                 inputField.value = '';
             }
         });
 
-        socket.addEventListener('open', function (event) {
-            console.log('WebSocket connection established.');
-        });
+        socket.addEventListener('message', async function (event) {
+            const msg = JSON.parse(event.data);
 
-        socket.addEventListener('message', function (event) {
-            console.log('Message from server:', event.data);
-            displayMessage(event.data);
-        });
+            switch (msg.event) {
+                case 'exchange':
+                    sender = msg.data.username;
+                    document.getElementById("other-person").innerText = "Connected to: " + sender;
 
-        socket.addEventListener('exchange', function(event) {
-            sender = event.data;
-            console.log('Sender Name:', event.data);
-        })
+                    peerConnection = new RTCPeerConnection();
 
-        socket.addEventListener('error', function (event) {
-            console.error('WebSocket error:', event);
-        });
+                    // handle local stream
+                    localStream.getTracks().forEach(track => {
+                        peerConnection.addTrack(track, localStream);
+                    });
 
-        socket.addEventListener('close', function (event) {
-            console.log('WebSocket connection closed:', event);
+                    // Handle remote stream
+                    peerConnection.ontrack = function ({ streams: [stream] }) {
+                        remoteVideo.srcObject = stream;
+                        remoteStream = stream;
+                    };
+
+                    if (msg.data.initiator == true) {
+                        try {
+                            const offer = await peerConnection.createOffer();
+                            await peerConnection.setLocalDescription(offer);
+                            socket.send(JSON.stringify({
+                                event: 'offer',
+                                data: offer,
+                            }));
+                            console.log('sent offer');
+                        } catch (error) {
+                            console.error('Error creating offer:', error);
+                        }
+                    }
+                    break;
+
+                case 'offer':
+                    try {
+                        await peerConnection.setRemoteDescription(new RTCSessionDescription(msg.data));
+                        const answer = await peerConnection.createAnswer();
+                        await peerConnection.setLocalDescription(answer);
+                        socket.send(JSON.stringify({
+                            event: 'answer',
+                            data: answer,
+                        }));
+                        console.log('got offer, sending answer');
+                    } catch (error) {
+                        console.error('Error handling offer:', error);
+                    }
+                    break;
+
+                case 'answer':
+                    try {
+                        await peerConnection.setRemoteDescription(new RTCSessionDescription(msg.data));
+                        console.log('received answer');
+                    } catch (error) {
+                        console.error('Error handling answer:', error);
+                    }
+                    break;
+
+                case 'candidate':
+                    try {
+                        await peerConnection.addIceCandidate(new RTCIceCandidate(msg.data));
+                        console.log('adding candidate');
+                    } catch (error) {
+                        console.error('Error adding ICE candidate:', error);
+                    }
+                    break;
+
+                case 'rematch':
+                    removeRemoteStream();
+                    break;
+
+                case 'message':
+                    displayMessage(msg.data);
+                    break;
+            }
+
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    socket.send(JSON.stringify({
+                        event: 'candidate',
+                        data: event.candidate
+                    }));
+                    console.log('sending candidate')
+                }
+            };
+
+            peerConnection.oniceconnectionstatechange = (event) => {
+                console.log('ICE connection state:', peerConnection.iceConnectionState);
+
+                if (peerConnection.iceConnectionState === 'disconnected') {
+                    rematch();
+                }
+            };
         });
     </script>
 </body>

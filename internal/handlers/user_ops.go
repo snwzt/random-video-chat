@@ -80,15 +80,18 @@ func (h *UserOperationsHandle) UserRemove() {
 
 		userID := user[1]
 
-		if err := h.Redis.SRem(context.Background(), "unpairedpool", userID).Err(); err != nil {
-			h.Logger.Err(err).Msg("unable to remove user from unpairedpool")
-			continue
-		}
-
 		matchid, err := h.Redis.HGet(context.Background(), fmt.Sprintf("userentry:%s", userID), "matchid").Result()
 		if err != nil {
 			h.Logger.Err(err).Msg("unable to get userentry")
 			continue
+		}
+
+		if !h.Redis.SIsMember(context.Background(), "unpairedpool", userID).Val() {
+			// delete forwarder
+			if err := h.Redis.Publish(context.Background(), "deletematch", matchid).Err(); err != nil {
+				h.Logger.Err(err).Msg("unable to publish to deletematch")
+				continue
+			}
 		}
 
 		// delete match entry
@@ -97,9 +100,9 @@ func (h *UserOperationsHandle) UserRemove() {
 			continue
 		}
 
-		// delete forwarder
-		if err := h.Redis.Publish(context.Background(), "deletematch", matchid).Err(); err != nil {
-			h.Logger.Err(err).Msg("unable to publish to deletematch")
+		// remove from unpaired pool
+		if err := h.Redis.SRem(context.Background(), "unpairedpool", userID).Err(); err != nil {
+			h.Logger.Err(err).Msg("unable to remove user from unpairedpool")
 			continue
 		}
 

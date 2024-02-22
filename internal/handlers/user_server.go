@@ -34,7 +34,7 @@ func (h *UserServerHandle) RegisterUser(c echo.Context) error {
 	userid := "user:" + username + ":" + uuid.New().String()
 
 	if err := h.Redis.HSet(context.Background(), fmt.Sprintf("userentry:%s", userid),
-		"username", username, "ipaddr", c.RealIP(), "sdp", "", "matchid", "").Err(); err != nil {
+		"username", username, "ipaddr", c.RealIP(), "matchid", "").Err(); err != nil {
 		h.Logger.Err(err).Msg("unable to add user entry")
 		return echo.NewHTTPError(http.StatusInternalServerError)
 	}

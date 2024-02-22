@@ -39,11 +39,11 @@ func Forwarder(cancelChan chan string, match models.Match, rclient *redis.Client
 		log.Err(err).Msg("unable to get userentry")
 	}
 
-	msgJSON1, err := json.Marshal(&models.SendMessage{
-		Event: "candidate",
-		Data: &models.Candidate{
-			SDP:      "",
-			Username: username2,
+	msgJSON1, err := json.Marshal(&models.Message{
+		Event: "exchange",
+		Data: &models.Exchange{
+			Username:  username2,
+			Initiator: true,
 		},
 	})
 	if err != nil {
@@ -54,11 +54,11 @@ func Forwarder(cancelChan chan string, match models.Match, rclient *redis.Client
 		log.Err(err).Msg("unable to publish to user1inc")
 	}
 
-	msgJSON2, err := json.Marshal(&models.SendMessage{
-		Event: "candidate",
-		Data: &models.Candidate{
-			SDP:      "",
-			Username: username1,
+	msgJSON2, err := json.Marshal(&models.Message{
+		Event: "exchange",
+		Data: &models.Exchange{
+			Username:  username1,
+			Initiator: false,
 		},
 	})
 	if err != nil {
@@ -82,36 +82,17 @@ func Forwarder(cancelChan chan string, match models.Match, rclient *redis.Client
 				return
 			}
 
-			msgJSON, err := json.Marshal(&models.SendMessage{
-				Event: "message",
-				Data: &models.Chat{
-					Message: msg.Payload,
-				},
-			})
-			if err != nil {
-				log.Err(err).Msg("unable to marshal message")
-			}
-
-			if err := rclient.Publish(context.Background(), User2Inc, msgJSON).Err(); err != nil {
+			if err := rclient.Publish(context.Background(), User2Inc, msg.Payload).Err(); err != nil {
 				log.Err(err).Msg("unable to publish to user2inc")
 			}
+
 		case msg, ok := <-user2Out.Channel():
 			if !ok {
-				log.Info().Msg("chat channel " + User1Out + " closed unexpectedly")
+				log.Info().Msg("chat channel " + User2Out + " closed unexpectedly")
 				return
 			}
 
-			msgJSON, err := json.Marshal(&models.SendMessage{
-				Event: "message",
-				Data: &models.Chat{
-					Message: msg.Payload,
-				},
-			})
-			if err != nil {
-				log.Err(err).Msg("unable to marshal message")
-			}
-
-			if err := rclient.Publish(context.Background(), User1Inc, msgJSON).Err(); err != nil {
+			if err := rclient.Publish(context.Background(), User1Inc, msg.Payload).Err(); err != nil {
 				log.Err(err).Msg("unable to publish to user1inc")
 			}
 		}

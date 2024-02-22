@@ -2,11 +2,8 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
-	"snwzt/rvc/data/models"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -63,10 +60,6 @@ func (h *ChatServerHandle) Chat(c echo.Context) error {
 			if msgType == -1 { // ws closing
 				ch <- true
 
-				if err := h.Redis.Publish(context.Background(), outMsgChannel, "unavaliable").Err(); err != nil {
-					h.Logger.Err(err).Msg("unable to publish to " + outMsgChannel)
-				}
-
 				if err := h.Redis.LPush(context.Background(), "removeuser", id).Err(); err != nil {
 					h.Logger.Err(err).Msg("unable to push to removeuser queue")
 				}
@@ -76,27 +69,9 @@ func (h *ChatServerHandle) Chat(c echo.Context) error {
 				return
 			}
 
-			var recieveMessage models.RecieveMessage
-
-			if err := json.Unmarshal(message, &recieveMessage); err != nil {
-				h.Logger.Err(err).Msg("unable to unmarshal recievedMessage")
-			}
-
-			if recieveMessage.Event == "sdp" {
-				log.Println(recieveMessage.Data)
-
-				// update sdp
-				if err := h.Redis.HSet(context.Background(), fmt.Sprintf("userentry:%s", id),
-					"sdp", recieveMessage.Data).Err(); err != nil {
-					h.Logger.Err(err).Msg("unable to update userentry")
-				}
-			}
-
-			if recieveMessage.Event == "message" {
-				// Publish the received message to a Redis Pub/Sub channel
-				if err := h.Redis.Publish(context.Background(), outMsgChannel, recieveMessage.Data).Err(); err != nil {
-					h.Logger.Err(err).Msg("unable to publish to " + outMsgChannel)
-				}
+			// Publish the received message to a Redis Pub/Sub channel
+			if err := h.Redis.Publish(context.Background(), outMsgChannel, message).Err(); err != nil {
+				h.Logger.Err(err).Msg("unable to publish to " + outMsgChannel)
 			}
 		}
 	}()
