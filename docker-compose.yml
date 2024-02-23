@@ -16,6 +16,8 @@ services:
     labels:
       - traefik.enable=true
       - traefik.http.middlewares.replacePathHealth.replacepath.path=/health
+      - "traefik.http.middlewares.rateLimiter.ratelimit.average=100"
+      - "traefik.http.middlewares.rateLimiter.ratelimit.burst=50"
     networks:
       - internal
 
@@ -42,6 +44,7 @@ services:
       - traefik.http.routers.userMatchRouter.rule=Host(`localhost`) && Path(`/match`)
       - traefik.http.routers.userHealthRouter.rule=Host(`localhost`) && PathPrefix(`/user/health`)
       - traefik.http.routers.userHealthRouter.middlewares=replacePathHealth
+      - traefik.http.routers.userHealthRouter.middlewares=rateLimiter
     networks:
       - internal
 
@@ -60,6 +63,7 @@ services:
       - traefik.http.routers.chatWSRouter.rule=Host(`localhost`) && PathPrefix(`/chat/`)
       - traefik.http.routers.chatHealthRouter.rule=Host(`localhost`) && PathPrefix(`/chat/health`)
       - traefik.http.routers.chatHealthRouter.middlewares=replacePathHealth
+      - traefik.http.routers.chatHealthRouter.middlewares=rateLimiter
     networks:
       - internal
 
