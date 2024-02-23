@@ -49,7 +49,7 @@ func (h *UserServerHandle) RegisterUser(c echo.Context) error {
 		Value: userid,
 	})
 
-	WsAddr := "ws://" + "localhost:5001" + "/chat/" + userid
+	WsAddr := "wss://" + c.Request().Host + "/chat/" + userid
 	TurnUrl := os.Getenv("TURN_URL")
 	TurnUser := os.Getenv("TURN_USERNAME")
 	TurnCred := os.Getenv("TURN_CRED")

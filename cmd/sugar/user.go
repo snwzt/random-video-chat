@@ -45,7 +45,7 @@ func newUserCmd(redis *redis.Client, zerolog *zerolog.Logger) *UserCmd {
 				Redis: redis,
 			}
 
-			s := user.NewUserServer(":5000", instance, userHttpHandle, zerolog)
+			s := user.NewUserServer(":"+os.Getenv("USER_SERVICE_PORT"), instance, userHttpHandle, zerolog)
 
 			wg.Add(1)
 			go func() {

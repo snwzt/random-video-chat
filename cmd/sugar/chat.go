@@ -1,6 +1,7 @@
 package sugar
 
 import (
+	"os"
 	"snwzt/rvc/internal/handlers"
 	"snwzt/rvc/services/chat"
 
@@ -28,7 +29,7 @@ func newChatCmd(redis *redis.Client, zerolog *zerolog.Logger) *ChatCmd {
 				Redis:  redis,
 				Logger: zerolog,
 			}
-			s := chat.NewChatServer(":5001", instance, chatServerHandle, zerolog)
+			s := chat.NewChatServer(":"+os.Getenv("CHAT_SERVICE_PORT"), instance, chatServerHandle, zerolog)
 
 			s.Run()
 
