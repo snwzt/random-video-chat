@@ -43,8 +43,7 @@ services:
       - traefik.http.routers.userRegisterRouter.rule=Host(`localhost`) && Path(`/register`)
       - traefik.http.routers.userMatchRouter.rule=Host(`localhost`) && Path(`/match`)
       - traefik.http.routers.userHealthRouter.rule=Host(`localhost`) && PathPrefix(`/user/health`)
-      - traefik.http.routers.userHealthRouter.middlewares=replacePathHealth
-      - traefik.http.routers.userHealthRouter.middlewares=rateLimiter
+      - traefik.http.routers.userHealthRouter.middlewares=replacePathHealth,rateLimiter
     networks:
       - internal
 
@@ -62,8 +61,7 @@ services:
       - traefik.http.services.chat-service.loadbalancer.server.port=5001
       - traefik.http.routers.chatWSRouter.rule=Host(`localhost`) && PathPrefix(`/chat/`)
       - traefik.http.routers.chatHealthRouter.rule=Host(`localhost`) && PathPrefix(`/chat/health`)
-      - traefik.http.routers.chatHealthRouter.middlewares=replacePathHealth
-      - traefik.http.routers.chatHealthRouter.middlewares=rateLimiter
+      - traefik.http.routers.chatHealthRouter.middlewares=replacePathHealth,rateLimiter
     networks:
       - internal
 
